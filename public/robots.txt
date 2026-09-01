@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /studio
+Disallow: /login
+
+Sitemap: /rss.xml
