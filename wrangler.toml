@@ -1,0 +1,22 @@
+# Cloudflare Workers deploy: npm run build:cf && npx wrangler deploy
+# Default `npm run build` still targets Vercel (App Builder).
+name = "datngo"
+main = ".output/server/index.mjs"
+compatibility_date = "2026-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".output/public"
+binding = "ASSETS"
+
+# Point Hyperdrive at Neon/Supabase/any Postgres, then set DATABASE_URL to the
+# Hyperdrive connection string in `wrangler secret` / dashboard.
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "your-hyperdrive-id"
+
+# Native R2 bucket. The app also talks to R2 via S3 API (R2_* env) so the same
+# code runs on Vercel.
+# [[r2_buckets]]
+# binding = "MEDIA_BUCKET"
+# bucket_name = "datngo-media"

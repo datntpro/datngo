@@ -11,19 +11,21 @@ import {
 } from "lucide-react";
 import { UserButton } from "@/lib/auth/gates";
 import { cn } from "@/lib/utils";
+import type { StaffRole } from "@/lib/cms/types";
 
-const ITEMS: { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean }[] = [
+const ITEMS: { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; admin?: boolean }[] = [
   { to: "/studio", label: "Bảng", icon: LayoutDashboard, exact: true },
   { to: "/studio/posts", label: "Bài viết", icon: PenLine },
   { to: "/studio/media", label: "Media", icon: ImageIcon },
   { to: "/studio/topics", label: "Chuyên mục", icon: FolderOpen },
   { to: "/studio/seo", label: "SEO", icon: BarChart3 },
   { to: "/studio/newsletter", label: "Thư", icon: Mail },
-  { to: "/studio/settings", label: "Cài đặt", icon: Settings },
+  { to: "/studio/settings", label: "Cài đặt", icon: Settings, admin: true },
 ];
 
-export function StudioNav() {
+export function StudioNav({ role }: { role?: StaffRole }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const items = ITEMS.filter((item) => !item.admin || role === "admin");
   return (
     <aside className="flex h-full flex-col border-r border-rule bg-paper-raised">
       <div className="flex h-14 items-center gap-2 border-b border-rule px-4">
@@ -33,7 +35,7 @@ export function StudioNav() {
         <span className="kicker">Studio</span>
       </div>
       <nav className="flex-1 p-2">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const active = item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`);
           const Icon = item.icon;
           return (

@@ -18,7 +18,10 @@ const APP_NAME = "DATNGO";
 const fetchSessionUser = createServerFn({ method: "GET" }).handler(async () => {
   const { getSessionUser } = await import("@/lib/auth/verify.server");
   const u = await getSessionUser();
-  return u ? { id: u.id, email: u.email } : null;
+  if (!u) return null;
+  const { peekStaff } = await import("@/lib/cms/staff");
+  const staff = await peekStaff(u.id, u.email);
+  return { id: u.id, email: u.email, studioRole: staff?.role ?? null };
 });
 
 export const Route = createRootRoute({

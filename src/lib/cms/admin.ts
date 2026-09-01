@@ -1,13 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
+import { r2Configured, r2Delete, r2Put } from "@/lib/r2";
 import { createId, slugify } from "@/lib/utils";
 import { excerptFrom, sanitizeHtml, statsFromHtml, withHeadingIds } from "./html";
 import { mapMedia, mapPost, mapProject, mapSettings, mapSubscriber, mapSummary, mapTag, type PostRow, type TagRow } from "./map";
 import { analyzeSeo } from "./seo";
-import { claimSeed, ensureSeed } from "./seed";
+import { ensureSeed } from "./seed";
+import { inviteStaff, listStaff, removeStaff, requireStudio } from "./staff";
 import { tagsForPosts } from "./tags";
-import type { AiReview, Post, PostStatus } from "./types";
+import type { AiReview, Post, PostStatus, StaffRole } from "./types";
 
 async function uniqueSlug(sql: Awaited<ReturnType<typeof getSql>>, base: string, ignoreId?: string) {
   let slug = slugify(base) || "bai-viet";
@@ -22,32 +24,45 @@ async function uniqueSlug(sql: Awaited<ReturnType<typeof getSql>>, base: string,
   }
 }
 
+export const getStudioSession = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const { resolveStudioStaff } = await import("./staff");
+    const staff = await resolveStudioStaff(context.userId, { bootstrap: true });
+    if (!staff) return { ok: false as const };
+    return { ok: true as const, role: staff.role, email: staff.email };
+  });
+
 export const studioBootstrap = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    const me = await requireStudio(context.userId);
     await ensureSeed();
-    await claimSeed(context.userId);
     const sql = await getSql();
     const posts = await sql<PostRow>`
-      select * from posts where user_id = ${context.userId} order by updated_at desc
+      select * from posts order by updated_at desc
     `;
     const tagMap = await tagsForPosts(posts.map((r) => r.id));
     const tags = await sql<TagRow>`select * from tags order by name`;
     const media = await sql<Record<string, unknown>>`
-      select * from media where user_id = ${context.userId} order by created_at desc
+      select * from media order by created_at desc
     `;
     const settingsRows = await sql<Record<string, unknown>>`select * from settings where id = 1`;
     const projects = await sql<Record<string, unknown>>`
-      select * from projects where user_id = ${context.userId} order by sort_order, title
+      select * from projects order by sort_order, title
     `;
     const subs = await sql<{ n: number }>`select count(*)::int as n from subscribers`;
     const published = posts.filter((p) => p.status === "published").length;
-    const drafts = posts.filter((p) => p.status === "draft").length;
+    const drafts = posts.filter((p) => p.status !== "published").length;
     const seoScores = posts.map((p) => p.seo_score).filter((n): n is number => n != null);
     const avgSeo = seoScores.length
       ? Math.round(seoScores.reduce((a, b) => a + Number(b), 0) / seoScores.length)
       : null;
+    const staff = me.role === "admin" ? await listStaff() : [];
     return {
+      me,
+      staff,
+      r2: { configured: r2Configured() },
       posts: posts.map((row) => mapSummary(row, tagMap[row.id] ?? [])),
       tags: tags.map(mapTag),
       media: media.map(mapMedia),
@@ -62,9 +77,10 @@ export const getMyPost = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .validator((id: string) => id)
   .handler(async ({ context, data: id }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
     const rows = await sql<PostRow>`
-      select * from posts where id = ${id} and user_id = ${context.userId} limit 1
+      select * from posts where id = ${id} limit 1
     `;
     const row = rows[0];
     if (!row) return null;
@@ -77,6 +93,7 @@ export const createPost = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { title?: string } | undefined) => input ?? {})
   .handler(async ({ context, data }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
     const id = createId();
     const title = data.title?.trim() || "Bài chưa đặt tên";
@@ -113,9 +130,10 @@ export const savePost = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: PostPatch) => input)
   .handler(async ({ context, data }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
     const existing = await sql<PostRow>`
-      select * from posts where id = ${data.id} and user_id = ${context.userId} limit 1
+      select * from posts where id = ${data.id} limit 1
     `;
     const row = existing[0];
     if (!row) throw new Error("Không tìm thấy bài viết.");
@@ -171,7 +189,7 @@ export const savePost = createServerFn({ method: "POST" })
         reading_minutes = ${stats.readingMinutes},
         word_count = ${stats.wordCount},
         updated_at = now()
-      where id = ${data.id} and user_id = ${context.userId}
+      where id = ${data.id}
     `;
 
     if (data.tagIds) {
@@ -181,7 +199,7 @@ export const savePost = createServerFn({ method: "POST" })
       }
     }
 
-    const next = await sql<PostRow>`select * from posts where id = ${data.id} and user_id = ${context.userId}`;
+    const next = await sql<PostRow>`select * from posts where id = ${data.id}`;
     const tagMap = await tagsForPosts([data.id]);
     return mapPost(next[0], tagMap[data.id] ?? []);
   });
@@ -196,8 +214,9 @@ export const deletePost = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((id: string) => id)
   .handler(async ({ context, data: id }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
-    await sql`delete from posts where id = ${id} and user_id = ${context.userId}`;
+    await sql`delete from posts where id = ${id}`;
     return { ok: true };
   });
 
@@ -205,13 +224,47 @@ export const addMedia = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { url: string; alt?: string; caption?: string; credit?: string }) => input)
   .handler(async ({ context, data }) => {
+    await requireStudio(context.userId);
     const url = data.url.trim();
     if (!/^https?:\/\//i.test(url)) throw new Error("URL ảnh phải bắt đầu bằng http(s).");
     const sql = await getSql();
     const id = createId();
     await sql`
-      insert into media (id, user_id, url, alt, caption, credit)
-      values (${id}, ${context.userId}, ${url}, ${data.alt ?? ""}, ${data.caption ?? ""}, ${data.credit ?? ""})
+      insert into media (id, user_id, url, alt, caption, credit, storage)
+      values (${id}, ${context.userId}, ${url}, ${data.alt ?? ""}, ${data.caption ?? ""}, ${data.credit ?? ""}, ${"url"})
+    `;
+    const rows = await sql<Record<string, unknown>>`select * from media where id = ${id}`;
+    return mapMedia(rows[0]);
+  });
+
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
+const MAX_UPLOAD = 6 * 1024 * 1024;
+
+export const uploadMedia = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: { filename: string; contentType: string; dataBase64: string; alt?: string; caption?: string; credit?: string }) =>
+      input,
+  )
+  .handler(async ({ context, data }) => {
+    await requireStudio(context.userId);
+    if (!r2Configured()) {
+      throw new Error("Chưa gắn Cloudflare R2. Dán URL ảnh, hoặc thêm biến R2_* khi deploy.");
+    }
+    const type = data.contentType.split(";")[0]?.trim() || "application/octet-stream";
+    if (!IMAGE_TYPES.has(type)) throw new Error("Chỉ nhận JPEG, PNG, WebP, GIF, AVIF.");
+    const comma = data.dataBase64.indexOf(",");
+    const b64 = comma >= 0 ? data.dataBase64.slice(comma + 1) : data.dataBase64;
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    if (bytes.byteLength > MAX_UPLOAD) throw new Error("Ảnh quá 6MB.");
+    const ext = type.split("/")[1] === "jpeg" ? "jpg" : type.split("/")[1];
+    const key = `media/${new Date().toISOString().slice(0, 10)}/${createId()}.${ext}`;
+    const url = await r2Put(key, bytes, type);
+    const sql = await getSql();
+    const id = createId();
+    await sql`
+      insert into media (id, user_id, url, alt, caption, credit, storage, object_key)
+      values (${id}, ${context.userId}, ${url}, ${data.alt ?? ""}, ${data.caption ?? ""}, ${data.credit ?? ""}, ${"r2"}, ${key})
     `;
     const rows = await sql<Record<string, unknown>>`select * from media where id = ${id}`;
     return mapMedia(rows[0]);
@@ -221,15 +274,20 @@ export const deleteMedia = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((id: string) => id)
   .handler(async ({ context, data: id }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
-    await sql`delete from media where id = ${id} and user_id = ${context.userId}`;
+    const rows = await sql<Record<string, unknown>>`select * from media where id = ${id}`;
+    const key = rows[0]?.object_key ? String(rows[0].object_key) : null;
+    if (key) await r2Delete(key);
+    await sql`delete from media where id = ${id}`;
     return { ok: true };
   });
 
 export const saveTag = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { id?: string; name: string; description?: string }) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
     const name = data.name.trim();
     if (!name) throw new Error("Tên chuyên mục trống.");
@@ -247,7 +305,8 @@ export const saveTag = createServerFn({ method: "POST" })
 export const deleteTag = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((id: string) => id)
-  .handler(async ({ data: id }) => {
+  .handler(async ({ context, data: id }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
     await sql`delete from tags where id = ${id}`;
     return { ok: true };
@@ -270,7 +329,8 @@ export const saveSettings = createServerFn({ method: "POST" })
       footerNote: string;
     }) => input,
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
+    await requireStudio(context.userId, "admin");
     const sql = await getSql();
     await sql`
       update settings set
@@ -306,6 +366,7 @@ export const saveProject = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ context, data }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
     const id = data.id || createId();
     await sql`
@@ -318,10 +379,9 @@ export const saveProject = createServerFn({ method: "POST" })
         year = excluded.year,
         tags = excluded.tags,
         sort_order = excluded.sort_order
-      where projects.user_id = ${context.userId}
     `;
     const rows = await sql<Record<string, unknown>>`
-      select * from projects where id = ${id} and user_id = ${context.userId}
+      select * from projects where id = ${id}
     `;
     return mapProject(rows[0]);
   });
@@ -330,14 +390,16 @@ export const deleteProject = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((id: string) => id)
   .handler(async ({ context, data: id }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
-    await sql`delete from projects where id = ${id} and user_id = ${context.userId}`;
+    await sql`delete from projects where id = ${id}`;
     return { ok: true };
   });
 
 export const listSubscribers = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    await requireStudio(context.userId);
     const sql = await getSql();
     const rows = await sql<Record<string, unknown>>`select * from subscribers order by created_at desc`;
     return rows.map(mapSubscriber);
@@ -347,11 +409,12 @@ export const reviewPostAi = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((id: string) => id)
   .handler(async ({ context, data: id }) => {
+    await requireStudio(context.userId);
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) return { ok: false as const, error: "AI chưa khả dụng trong môi trường này." };
     const sql = await getSql();
     const rows = await sql<PostRow>`
-      select * from posts where id = ${id} and user_id = ${context.userId} limit 1
+      select * from posts where id = ${id} limit 1
     `;
     const row = rows[0];
     if (!row) return { ok: false as const, error: "Không tìm thấy bài viết." };
@@ -388,9 +451,26 @@ export const reviewPostAi = createServerFn({ method: "POST" })
     }
     await sql`
       update posts set ai_score = ${Number(review.score) || 0}, ai_report = ${JSON.stringify(review)}, updated_at = now()
-      where id = ${id} and user_id = ${context.userId}
+      where id = ${id}
     `;
     return { ok: true as const, review };
+  });
+
+export const addStaffMember = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { email: string; role: StaffRole }) => input)
+  .handler(async ({ context, data }) => {
+    await requireStudio(context.userId, "admin");
+    return inviteStaff(data.email, data.role);
+  });
+
+export const deleteStaffMember = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    await requireStudio(context.userId, "admin");
+    await removeStaff(id, context.userId);
+    return { ok: true };
   });
 
 export type { Post };

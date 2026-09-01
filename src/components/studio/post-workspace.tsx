@@ -7,7 +7,7 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { reviewPostAi, savePost, type PostPatch } from "@/lib/cms/admin";
+import { reviewPostAi, savePost, deletePost, type PostPatch } from "@/lib/cms/admin";
 import { analyzeSeo } from "@/lib/cms/seo";
 import type { AiReview, MediaItem, Post, SeoReport, Tag } from "@/lib/cms/types";
 import { cn, slugify } from "@/lib/utils";
@@ -155,9 +155,29 @@ export function PostWorkspace({
   }, []);
 
   async function publish() {
-    const updated = await persist({ status: draft.status === "published" ? "draft" : "published" });
+    const next = draft.status === "published" ? "draft" : "published";
+    const updated = await persist({ status: next });
     if (updated?.status === "published") {
+      toast.success("Đã xuất bản");
       void navigate({ to: "/writing/$slug", params: { slug: updated.slug } });
+    } else if (updated) {
+      toast.success("Đã ẩn khỏi site");
+    }
+  }
+
+  async function hide() {
+    const updated = await persist({ status: "draft" });
+    if (updated) toast.success("Đã ẩn khỏi site");
+  }
+
+  async function remove() {
+    if (!confirm("Xóa vĩnh viễn bài này? Không hoàn tác được.")) return;
+    try {
+      await deletePost({ data: post.id });
+      toast.success("Đã xóa bài");
+      void navigate({ to: "/studio/posts" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không xóa được");
     }
   }
 
@@ -202,7 +222,7 @@ export function PostWorkspace({
             Lưu
           </Button>
           <Button type="button" size="sm" onClick={() => void publish()} disabled={saving}>
-            {draft.status === "published" ? "Gỡ xuất bản" : "Xuất bản"}
+            {draft.status === "published" ? "Ẩn khỏi site" : "Xuất bản"}
           </Button>
         </div>
       </header>
@@ -249,6 +269,8 @@ export function PostWorkspace({
               ai={ai}
               aiBusy={aiBusy}
               onAi={() => void runAi()}
+              onHide={() => void hide()}
+              onDelete={() => void remove()}
             />
           </div>
         </aside>
@@ -265,6 +287,8 @@ export function PostWorkspace({
             ai={ai}
             aiBusy={aiBusy}
             onAi={() => void runAi()}
+            onHide={() => void hide()}
+            onDelete={() => void remove()}
           />
         </SheetContent>
       </Sheet>
@@ -281,6 +305,8 @@ function MetaPanel({
   ai,
   aiBusy,
   onAi,
+  onHide,
+  onDelete,
 }: {
   draft: Draft;
   patch: (p: Partial<Draft>) => void;
@@ -290,6 +316,8 @@ function MetaPanel({
   ai: AiReview | null;
   aiBusy: boolean;
   onAi: () => void;
+  onHide: () => void;
+  onDelete: () => void;
 }) {
   return (
     <div className="space-y-8">
@@ -303,6 +331,13 @@ function MetaPanel({
           <Label htmlFor="slug">Slug</Label>
           <Input id="slug" value={draft.slug} onChange={(e) => patch({ slug: slugify(e.target.value) })} />
         </div>
+        {draft.status === "published" ? (
+          <Button type="button" variant="outline" className="mt-4 w-full" onClick={onHide}>
+            Ẩn khỏi site
+          </Button>
+        ) : (
+          <p className="mt-3 text-sm text-muted">Nháp — không hiện trên site công khai.</p>
+        )}
       </section>
 
       <section>
@@ -443,6 +478,14 @@ function MetaPanel({
         ) : (
           <p className="mt-3 text-sm text-muted">Gọi khi bài gần xong — không phải mỗi lần gõ.</p>
         )}
+      </section>
+
+      <section className="border-t border-rule pt-6">
+        <p className="kicker mb-3">Xóa</p>
+        <p className="mb-3 text-sm text-muted">Xóa vĩnh viễn, không nằm trong nháp.</p>
+        <Button type="button" variant="destructive" className="w-full" onClick={onDelete}>
+          Xóa bài viết
+        </Button>
       </section>
     </div>
   );

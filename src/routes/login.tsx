@@ -11,7 +11,7 @@ function Login() {
         <p className="kicker">Studio</p>
         <h1 className="mt-3 font-serif text-4xl tracking-tight">Vào bàn viết.</h1>
         <p className="mt-3 text-sm text-muted">
-          Chỉ người đã đăng nhập mới soạn, xuất bản, và chấm SEO. Site công khai vẫn đọc được không cần tài khoản.
+          Studio chỉ dành cho người được mời. Đọc bài không cần tài khoản. Muốn nhận bài qua email — đăng ký Thư, không cần đăng nhập.
         </p>
         <div className="mt-8 space-y-2">
           {authEnabled ? (
@@ -30,9 +30,14 @@ function Login() {
             <p className="text-sm text-muted">Đăng nhập đang tắt.</p>
           )}
         </div>
-        <Link to="/" className="mt-8 inline-block font-mono text-[11px] tracking-wide text-muted uppercase no-underline hover:text-ink">
-          ← Về trang chủ
-        </Link>
+        <div className="mt-8 flex flex-wrap gap-4 font-mono text-[11px] tracking-wide uppercase">
+          <Link to="/" className="text-muted no-underline hover:text-ink">
+            ← Trang chủ
+          </Link>
+          <Link to="/newsletter" className="text-muted no-underline hover:text-ink">
+            Đăng ký thư
+          </Link>
+        </div>
       </div>
     </main>
   );

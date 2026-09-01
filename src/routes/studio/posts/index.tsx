@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { createPost, deletePost, studioBootstrap } from "@/lib/cms/admin";
+import { createPost, deletePost, savePost, studioBootstrap } from "@/lib/cms/admin";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
@@ -66,7 +66,20 @@ function PostsIndex() {
                 <td className="font-mono text-sm tabular-nums">{post.seoScore ?? "—"}</td>
                 <td className="font-mono text-sm tabular-nums">{post.aiScore ?? "—"}</td>
                 <td className="font-mono text-[11px] text-faint">{formatDate(post.updatedAt)}</td>
-                <td>
+                <td className="whitespace-nowrap">
+                  {post.status === "published" ? (
+                    <button
+                      type="button"
+                      className="mr-3 font-mono text-[11px] text-muted uppercase hover:text-ink"
+                      onClick={() =>
+                        savePost({ data: { id: post.id, status: "draft" } }).then(() =>
+                          qc.invalidateQueries({ queryKey: ["studio"] }),
+                        )
+                      }
+                    >
+                      Ẩn
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="font-mono text-[11px] text-brick uppercase"

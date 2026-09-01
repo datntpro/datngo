@@ -17,11 +17,10 @@ function NewsletterPage() {
     <SiteShell settings={settings}>
       <section className="site-grid grid gap-12 py-14 lg:grid-cols-[1.2fr_0.8fr]">
         <div>
-          <p className="kicker">Beehiiv</p>
-          <h1 className="mt-2 font-serif text-5xl tracking-tight">Thư không phải feed.</h1>
+          <p className="kicker">Thư</p>
+          <h1 className="mt-2 font-serif text-5xl tracking-tight">Đọc khi rảnh, không khi scroll.</h1>
           <p className="mt-4 max-w-lg text-lg text-muted">
-            Mỗi số là một bài đã xuất bản trên DATNGO, gửi thẳng vào hộp thư. Không thread, không hype.
-            Dán embed Beehiiv trong Studio nếu bạn đã có publication.
+            Mỗi số là một bài đã xuất bản trên DATNGO, gửi thẳng vào hộp thư. Không cần tài khoản để đọc trên site.
           </p>
           <div className="mt-8">
             <NewsletterForm settings={settings} source="newsletter" />

@@ -69,7 +69,7 @@ function StudioHome() {
           <div className="border border-rule p-5">
             <p className="kicker">Newsletter</p>
             <p className="mt-2 font-serif text-4xl tabular-nums">{data.subscriberCount}</p>
-            <p className="text-sm text-muted">người đăng ký local. Beehiiv vẫn là kênh gửi.</p>
+            <p className="text-sm text-muted">người đã để lại email.</p>
             <Link to="/studio/newsletter" className="mt-3 inline-block font-mono text-[11px] uppercase text-forest no-underline">
               Quản lý
             </Link>

@@ -1,44 +1,47 @@
 # DATNGO
 
-Studio viết kỹ thuật của Dat Ngo — field notes về hạ tầng, bảo mật, GitOps và cách làm sản phẩm có trọng lượng.
+Site viết kỹ thuật. Đọc tự do, không cần tài khoản. Studio chỉ dành cho người viết được mời.
 
-Site công khai tập trung vào bài viết. Phía sau là CMS kiểu Ghost: editor TipTap, SEO lint, chấm bài bằng AI, media bằng URL ngoài (không lưu file trên server), newsletter Beehiiv.
+## Ai được vào Studio?
 
-## Trang công khai
-
-- `/` — trang chủ editorial
-- `/writing` — toàn bộ bài
-- `/writing/:slug` — bài viết, mục lục, reading progress
-- `/topics/:slug` — chuyên mục
-- `/work` — việc đang làm
-- `/about` — tiểu sử
-- `/newsletter` — đăng ký thư (form nội bộ hoặc embed Beehiiv)
-- `/rss.xml` — RSS
-
-## Studio (CMS)
-
-Vào `/studio` sau khi đăng nhập (Google / X).
-
-- Soạn bài kiểu Ghost: tiêu đề lớn, excerpt, thanh công cụ, ảnh từ URL hoặc thư viện
-- Tự lưu nháp, xuất bản / gỡ xuất bản
-- Phân tích SEO (tiêu đề, meta, heading, keyword, alt)
-- Chấm chất lượng bài bằng Grok (nút trong editor)
-- Media catalog — chỉ lưu URL, alt, caption, credit
-- Topics, newsletter Beehiiv embed, cài đặt site
-
-Bài seed được claim bởi tài khoản Studio đầu tiên đăng nhập.
+- **Độc giả:** đọc mọi bài, đăng ký thư bằng email. Không đăng nhập.
+- **Người lạ bấm /studio rồi login Google/X:** bị từ chối — không soạn được, không đụng được bài.
+- **Admin:** tài khoản Studio đầu tiên (hoặc email trong `STUDIO_ADMIN_EMAIL`). Toàn quyền, mời thêm người.
+- **Publisher:** email được admin mời. Soạn / ẩn / xóa bài, media. Không sửa cài đặt site.
 
 ## Stack
 
-TanStack Start, Postgres (Neon trên production, PGLite khi dev), Better Auth, TipTap, Beehiiv.
+TanStack Start, Postgres, Better Auth (Google / X), TipTap, Cloudflare R2 cho file.
 
-## Chạy local
+## Media
 
-```bash
-npm install
-npm run dev
-```
+Dán URL, hoặc tải file lên R2 khi các biến sau được gắn lúc deploy:
 
-Cần `DATABASE_URL` (Neon) khi deploy. `XAI_API_KEY` để chấm bài bằng AI. Auth credentials do môi trường triển khai inject.
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET`
+- `R2_PUBLIC_BASE_URL`
 
-Dán URL form Beehiiv trong Studio → Newsletter nếu muốn embed chính thức.
+## Database: Neon, Supabase, Cloudflare
+
+App nói **Postgres**. Preview không gắn `DATABASE_URL` thì dùng PGLite (Postgres WASM).
+
+Neon được dùng vì môi trường này inject `DATABASE_URL` Postgres serverless (scale-to-zero, nhánh DB). Supabase free cũng là Postgres + thêm Auth/Storage sẵn — nếu trỏ `DATABASE_URL` sang Supabase thì schema hiện tại chạy được; không cần đổi code.
+
+Cloudflare **D1** là SQLite, không phải Postgres. Đổi sang D1 nghĩa là viết lại SQL + Better Auth. Trên Cloudflare, đường native thực tế với codebase này:
+
+- Workers (`npm run build:cf`) + `nodejs_compat`
+- Postgres qua **Hyperdrive** (Neon, Supabase, hoặc Postgres bất kỳ) → `DATABASE_URL`
+- **R2** cho ảnh
+- CDN của Cloudflare cho static
+
+`npm run build` mặc định vẫn ra Vercel.
+
+## Env khi deploy
+
+- `DATABASE_URL` — Postgres
+- `STUDIO_ADMIN_EMAIL` — (tuỳ chọn) chỉ email này được nhận ghế admin đầu tiên
+- `XAI_API_KEY` — chấm bài AI
+- `R2_*` — tải file
+- Auth secrets do nền tảng inject

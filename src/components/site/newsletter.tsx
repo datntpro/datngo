@@ -36,10 +36,10 @@ export function NewsletterForm({
     <div className={compact ? "" : "border border-rule bg-paper-raised p-6 sm:p-8"}>
       {!compact ? (
         <>
-          <p className="kicker">Newsletter · Beehiiv</p>
+          <p className="kicker">Thư</p>
           <h2 className="mt-3 font-serif text-3xl tracking-tight">Gửi vào hộp thư, không phải feed.</h2>
           <p className="mt-3 max-w-md text-muted">
-            Một bài khi chắc. Không hype cycle. Có thể dán form Beehiiv trong Studio → Newsletter.
+            Một bài khi chắc. Không hype, không chuỗi thông báo.
           </p>
         </>
       ) : null}

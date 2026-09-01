@@ -34,17 +34,17 @@ function NewsletterAdmin() {
       });
     },
     onSuccess: () => {
-      toast.success("Đã lưu Beehiiv");
+      toast.success("Đã lưu form đăng ký");
       void qc.invalidateQueries({ queryKey: ["studio"] });
     },
   });
 
   return (
     <div className="px-5 py-8 sm:px-8">
-      <p className="kicker">Beehiiv</p>
+      <p className="kicker">Thư</p>
       <h1 className="mt-2 font-serif text-4xl tracking-tight">Newsletter</h1>
       <p className="mt-2 max-w-xl text-muted">
-        Dán URL embed Beehiiv (iframe src). Form trên site sẽ hiện iframe. Email thu tại đây là bản sao local — bạn vẫn gửi từ Beehiiv.
+        Form trên site thu email tại đây. Nếu đã có form đăng ký riêng, dán URL iframe — trang Thư sẽ hiện form đó.
       </p>
       <form
         className="mt-8 max-w-xl space-y-3 border border-rule p-5"
@@ -62,7 +62,7 @@ function NewsletterAdmin() {
           <Input
             value={embed}
             onChange={(e) => setEmbed(e.target.value)}
-            placeholder="https://subscribe-forms.beehiiv.com/…"
+            placeholder="https://…"
           />
         </div>
         <Button type="submit">Lưu</Button>

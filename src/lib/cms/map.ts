@@ -122,6 +122,8 @@ export function mapMedia(row: Record<string, unknown>): MediaItem {
     alt: String(row.alt ?? ""),
     caption: String(row.caption ?? ""),
     credit: String(row.credit ?? ""),
+    storage: String(row.storage ?? "url") === "r2" ? "r2" : "url",
+    objectKey: row.object_key ? String(row.object_key) : null,
     createdAt: asString(row.created_at) ?? "",
   };
 }

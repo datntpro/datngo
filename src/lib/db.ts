@@ -18,6 +18,10 @@ const databaseUrl =
  */
 export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
 
+function runningOnCloudflare() {
+  return typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
+}
+
 /**
  * Minimal shared SQL surface, satisfied by both Neon and PGLite. Both the
  * tagged-template and `.query()` forms resolve to an array of row objects:
@@ -169,6 +173,21 @@ async function createPgliteSql(): Promise<Sql> {
 
 let sqlPromise: Promise<Sql> | null = null;
 
+function createNeonHttpSql(): Promise<Sql> {
+  globalRef.__pgSqlPromise__ ??= (async () => {
+    const { neon } = await import("@neondatabase/serverless");
+    const sql = neon(databaseUrl!);
+    return toSql(async <T>(text: string, params: unknown[]) => {
+      const rows = await sql.query(text, params);
+      return rows as T[];
+    });
+  })().catch((err) => {
+    globalRef.__pgSqlPromise__ = undefined;
+    throw err;
+  });
+  return globalRef.__pgSqlPromise__;
+}
+
 async function createSql(): Promise<Sql> {
   if (typeof window !== "undefined") {
     throw new Error(
@@ -176,7 +195,12 @@ async function createSql(): Promise<Sql> {
         "or a server route loader, never from client code.",
     );
   }
-  return dbSource === "neon" ? createNeonSql() : createPgliteSql();
+  if (dbSource !== "neon") return createPgliteSql();
+  if (runningOnCloudflare()) {
+    if (!databaseUrl) throw new Error("DATABASE_URL is required on Cloudflare (Hyperdrive or Neon).");
+    return createNeonHttpSql();
+  }
+  return createNeonSql();
 }
 
 /**

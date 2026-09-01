@@ -46,6 +46,8 @@ export type MediaItem = {
   alt: string;
   caption: string;
   credit: string;
+  storage: "url" | "r2";
+  objectKey: string | null;
   createdAt: string;
 };
 
@@ -78,6 +80,15 @@ export type Subscriber = {
   email: string;
   source: string;
   createdAt: string;
+};
+
+export type StaffRole = "admin" | "publisher";
+
+export type StaffMember = {
+  id: string;
+  userId: string | null;
+  email: string | null;
+  role: StaffRole;
 };
 
 export type TocItem = {

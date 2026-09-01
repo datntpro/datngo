@@ -14,8 +14,13 @@ const NAV = [
 
 export function SiteHeader() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const session = useRouterState({
+    select: (s) =>
+      (s.matches[0]?.context as { sessionUser?: { studioRole?: string | null } | null } | undefined)?.sessionUser,
+  });
   const { user, isPending } = useCurrentUserState();
   const search = useSearchOpen();
+  const isStaff = Boolean(session?.studioRole);
 
   return (
     <header className="sticky top-0 z-40 border-b border-rule bg-paper/90 backdrop-blur-sm">
@@ -52,7 +57,7 @@ export function SiteHeader() {
           </button>
           {isPending ? (
             <div className="size-8 shrink-0 animate-pulse bg-code" />
-          ) : user ? (
+          ) : isStaff ? (
             <div className="flex items-center gap-2">
               <Link
                 to="/studio"
@@ -62,14 +67,9 @@ export function SiteHeader() {
               </Link>
               <UserButton />
             </div>
-          ) : (
-            <Link
-              to="/login"
-              className="shrink-0 px-1.5 py-2 font-mono text-[11px] tracking-[0.12em] text-muted uppercase no-underline hover:text-ink sm:px-2"
-            >
-              Studio
-            </Link>
-          )}
+          ) : user ? (
+            <UserButton />
+          ) : null}
         </nav>
       </div>
       <SearchDialog open={search.value} onOpenChange={search.set} />
